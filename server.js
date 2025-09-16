@@ -6,6 +6,8 @@ require('dotenv').config();
 const jobRoutes = require('./backend/routes/jobs');
 const requirementRoutes = require('./backend/routes/requirements');
 const storyRoutes = require('./backend/routes/stories');
+const userRoutes = require('./backend/routes/users');
+const matchingRoutes = require('./backend/routes/matching');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -19,6 +21,8 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/api/jobs', jobRoutes);
 app.use('/api/requirements', requirementRoutes);
 app.use('/api/stories', storyRoutes);
+app.use('/api/users', userRoutes);
+app.use('/api/matching', matchingRoutes);
 
 // Serve uploaded files
 app.use('/uploads', express.static('uploads'));
