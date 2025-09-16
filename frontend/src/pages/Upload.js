@@ -1,20 +1,39 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { jobsAPI } from '../services/api';
+import { useUser } from '../contexts/UserContext';
 import './Upload.css';
 
 function Upload() {
   const [uploadType, setUploadType] = useState('pdf');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const navigate = useNavigate();
-
   const [formData, setFormData] = useState({
     company: '',
     role: '',
     url: '',
     file: null
   });
+
+  const navigate = useNavigate();
+  const { user, isAuthenticated, loading: userLoading } = useUser();
+
+  // Redirect if not authenticated
+  React.useEffect(() => {
+    if (!userLoading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, userLoading, navigate]);
+
+  // Show loading while checking authentication
+  if (userLoading) {
+    return <div className="upload"><div className="upload-container">Loading...</div></div>;
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -36,6 +55,12 @@ function Upload() {
     setLoading(true);
     setError(null);
 
+    if (!user) {
+      setError('You must be logged in to upload jobs');
+      setLoading(false);
+      return;
+    }
+
     try {
       let result;
 
@@ -48,6 +73,7 @@ function Upload() {
         data.append('pdf', formData.file);
         data.append('company', formData.company);
         data.append('role', formData.role);
+        data.append('user_id', user.id.toString());
 
         result = await jobsAPI.uploadPDF(data);
       } else {
@@ -58,11 +84,12 @@ function Upload() {
         result = await jobsAPI.uploadURL({
           url: formData.url,
           company: formData.company,
-          role: formData.role
+          role: formData.role,
+          user_id: user.id
         });
       }
 
-      navigate(`/jobs/${result.data.jobId}`);
+      navigate(`/jobs/${result.data.jobId}/suggestions`);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
     } finally {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { jobsAPI, storiesAPI } from '../services/api';
+import { jobsAPI, matchingAPI } from '../services/api';
 import StarStoryForm from '../components/StarStoryForm';
 import RequirementCard from '../components/RequirementCard';
 import './JobDetail.css';
@@ -36,7 +36,7 @@ function JobDetail() {
 
     for (const req of requirements) {
       try {
-        const response = await storiesAPI.getByRequirementId(req.id);
+        const response = await matchingAPI.getStoriesForRequirement(req.id);
         storiesData[req.id] = response.data;
       } catch (err) {
         storiesData[req.id] = [];
@@ -97,6 +97,15 @@ function JobDetail() {
             </span>
             <span className="date">Added {formatDate(job.created)}</span>
           </div>
+        </div>
+
+        <div className="job-actions">
+          <button
+            onClick={() => navigate(`/jobs/${id}/suggestions`)}
+            className="btn btn-primary"
+          >
+            💡 Get Story Suggestions
+          </button>
         </div>
       </div>
 

@@ -1,8 +1,23 @@
 const db = require('../models/database');
+const SemanticMatcher = require('./semanticMatcher');
 
 class StoryMatchingService {
+  constructor() {
+    this.semanticMatcher = new SemanticMatcher();
+    this.initialized = false;
+  }
+
+  async initialize() {
+    if (!this.initialized) {
+      await this.semanticMatcher.initialize();
+      this.initialized = true;
+    }
+  }
+
   // Find potential story matches for a list of requirements
   async findMatches(userId, requirements) {
+    await this.initialize();
+
     try {
       // Get all user's existing stories
       const [userStories] = await db.execute(`
@@ -18,7 +33,7 @@ class StoryMatchingService {
       const matches = [];
 
       for (const requirement of requirements) {
-        const potentialMatches = this.scoreStories(requirement, userStories);
+        const potentialMatches = await this.scoreStories(requirement, userStories);
 
         if (potentialMatches.length > 0) {
           matches.push({
@@ -37,14 +52,14 @@ class StoryMatchingService {
     }
   }
 
-  // Score stories based on similarity to requirement
-  scoreStories(requirement, userStories) {
+  // Score stories based on semantic similarity to requirement
+  async scoreStories(requirement, userStories) {
     const matches = [];
 
     for (const story of userStories) {
-      const score = this.calculateSimilarityScore(requirement, story);
+      const score = await this.calculateSimilarityScore(requirement, story);
 
-      // Only suggest stories with a reasonable similarity score
+      // Use semantic similarity threshold (0.3 is a good balance)
       if (score > 0.3) {
         // Check if story is already mapped to this requirement
         const mappedRequirements = story.mapped_requirement_ids ?
@@ -68,45 +83,35 @@ class StoryMatchingService {
       .slice(0, 3);
   }
 
-  // Simple text similarity scoring algorithm
-  calculateSimilarityScore(requirement, story) {
-    const reqText = `${requirement.title} ${requirement.description}`.toLowerCase();
-    const storyText = `${story.title} ${story.description || ''} ${story.situation} ${story.task} ${story.action} ${story.result}`.toLowerCase();
-
-    // Extract keywords from requirement
-    const reqKeywords = this.extractKeywords(reqText);
-    const storyKeywords = this.extractKeywords(storyText);
-
-    if (reqKeywords.length === 0 || storyKeywords.length === 0) {
+  // Enhanced semantic similarity scoring with domain filtering
+  async calculateSimilarityScore(requirement, story) {
+    // Apply domain filtering first for obviously unrelated content
+    if (this.isDomainMismatch(requirement, story)) {
       return 0;
     }
 
-    // Calculate intersection
-    const intersection = reqKeywords.filter(keyword =>
-      storyKeywords.some(storyKeyword =>
-        storyKeyword.includes(keyword) || keyword.includes(storyKeyword)
-      )
-    );
-
-    // Simple Jaccard similarity
-    const union = new Set([...reqKeywords, ...storyKeywords]);
-    return intersection.length / union.size;
+    // Use semantic similarity from the model
+    const semanticScore = await this.semanticMatcher.calculateSimilarity(requirement, story);
+    return semanticScore;
   }
 
-  // Extract meaningful keywords from text
-  extractKeywords(text) {
-    const stopWords = new Set([
-      'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for',
-      'of', 'with', 'by', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
-      'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
-      'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those'
-    ]);
+  // Check for domain mismatches (like healthcare requirements vs non-healthcare stories)
+  isDomainMismatch(requirement, story) {
+    const reqText = `${requirement.title} ${requirement.description || ''}`.toLowerCase();
+    const storyText = `${story.title} ${story.description || ''} ${story.situation || ''} ${story.task || ''} ${story.action || ''} ${story.result || ''}`.toLowerCase();
 
-    return text
-      .replace(/[^\w\s]/g, '') // Remove punctuation
-      .split(/\s+/) // Split by whitespace
-      .filter(word => word.length > 2 && !stopWords.has(word)) // Filter short words and stop words
-      .map(word => word.toLowerCase());
+    // Healthcare domain filtering - only filter if completely unrelated
+    const healthcareKeywords = ['healthcare', 'medical', 'hospital', 'clinical', 'patient', 'pharma', 'medicare', 'medicaid', 'hipaa'];
+    const reqContainsHealthcare = healthcareKeywords.some(keyword => reqText.includes(keyword));
+
+    if (reqContainsHealthcare) {
+      const storyContainsHealthcare = healthcareKeywords.some(keyword => storyText.includes(keyword));
+      if (!storyContainsHealthcare) {
+        return true; // Domain mismatch
+      }
+    }
+
+    return false; // No domain mismatch detected
   }
 
   // Map a story to a requirement
