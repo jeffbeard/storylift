@@ -1,0 +1,95 @@
+.job-detail {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.job-header {
+  margin-bottom: 2rem;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 0;
+}
+
+.back-btn:hover {
+  text-decoration: underline;
+}
+
+.job-info h1 {
+  color: #1f2937;
+  margin: 0 0 0.5rem 0;
+  font-size: 2rem;
+}
+
+.job-info h2 {
+  color: #6b7280;
+  margin: 0 0 1rem 0;
+  font-weight: 500;
+  font-size: 1.25rem;
+}
+
+.job-meta {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+.source-type {
+  background-color: #f3f4f6;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+.loading, .error {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.1rem;
+}
+
+.error {
+  color: #dc2626;
+  background-color: #fef2f2;
+  border-radius: 8px;
+  border: 1px solid #fecaca;
+}
+
+.requirements-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+}
+
+.requirements-section h3 {
+  color: #1f2937;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  border-bottom: 2px solid #e5e7eb;
+  padding-bottom: 0.5rem;
+}
+
+.requirements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .job-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .requirements-grid {
+    grid-template-columns: 1fr;
+  }
+}
