@@ -5,12 +5,73 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 const db = require('../models/database');
 const claudeService = require('../services/claudeService');
 
 const router = express.Router();
 
 const upload = multer({ dest: 'uploads/' });
+
+// Function to scrape JavaScript-rendered pages
+async function scrapeWithPuppeteer(url) {
+  let browser = null;
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox']
+    });
+    const page = await browser.newPage();
+
+    // Set a reasonable timeout and wait for content to load
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+    // Wait a bit more for dynamic content
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Extract text content, focusing on job-related content
+    const content = await page.evaluate(() => {
+      // Remove unwanted elements
+      const unwantedSelectors = ['script', 'style', 'nav', 'footer', 'header', '.nav', '.navbar', '.footer', '.header'];
+      unwantedSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => el.remove());
+      });
+
+      // Try to find job-specific content containers
+      const jobSelectors = [
+        '.job-description',
+        '.job-content',
+        '.job-posting',
+        '.posting-content',
+        '.job-details',
+        '#job-description',
+        '[class*="job"]',
+        '[class*="posting"]',
+        '[class*="description"]',
+        'main',
+        '.content',
+        '[role="main"]'
+      ];
+
+      for (const selector of jobSelectors) {
+        const element = document.querySelector(selector);
+        if (element && element.innerText.trim().length > 200) {
+          return element.innerText.trim();
+        }
+      }
+
+      // Fallback to body content
+      return document.body.innerText.trim();
+    });
+
+    return content;
+  } finally {
+    if (browser) {
+      await browser.close();
+    }
+  }
+}
 
 // Get job descriptions - optionally filter by user_id
 router.get('/', async (req, res) => {
@@ -185,6 +246,37 @@ router.post('/upload-url', async (req, res) => {
       }
     } else {
       textContent = JSON.stringify(content, null, 2);
+    }
+
+    // Check if we got meaningful content, if not try Puppeteer
+    if (!textContent || textContent.trim().length < 50) {
+      console.log('Basic scraping failed, trying Puppeteer for JavaScript-rendered content...');
+      try {
+        textContent = await scrapeWithPuppeteer(url);
+
+        // Clean up whitespace for Puppeteer content too
+        textContent = textContent
+          .replace(/\s+/g, ' ')
+          .replace(/\n\s*\n/g, '\n')
+          .trim();
+
+        // Truncate if too long
+        if (textContent.length > 8000) {
+          textContent = textContent.substring(0, 8000) + '...';
+        }
+
+        // Check if Puppeteer was successful
+        if (!textContent || textContent.trim().length < 50) {
+          return res.status(400).json({
+            error: 'Unable to extract meaningful content from URL even with JavaScript rendering. Please try copying and pasting the job description manually.'
+          });
+        }
+      } catch (puppeteerError) {
+        console.error('Puppeteer scraping failed:', puppeteerError.message);
+        return res.status(400).json({
+          error: 'Unable to extract meaningful content from URL. The page may have anti-scraping measures. Please try copying and pasting the job description manually.'
+        });
+      }
     }
 
     const companyName = company || 'Unknown Company';

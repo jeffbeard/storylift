@@ -67,3 +67,7 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+
+star-stories.pdf
+
+SESSION_METRICS.md
