@@ -1,5 +1,9 @@
 # StoryLift 📝
 
+<div align="center">
+  <img src="sage_owl_mascot.png" alt="Sage the Mentor Owl - StoryLift Mascot" width="200" height="150">
+</div>
+
 > Transform job requirements into compelling STAR stories with AI-powered extraction
 
 StoryLift is a full-stack web application that helps job seekers create professional STAR-format (Situation, Task, Action, Result) stories by automatically extracting requirements and qualifications from job descriptions using Claude AI.
