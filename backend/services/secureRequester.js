@@ -1,5 +1,6 @@
 const axios = require('axios');
 const urlValidator = require('./urlValidator');
+const requestLogger = require('./requestLogger');
 
 class SecureRequester {
   constructor() {
@@ -18,11 +19,25 @@ class SecureRequester {
     };
   }
 
-  async secureGet(urlString) {
+  async secureGet(urlString, requestContext = {}) {
+    const startTime = Date.now();
+    const requestId = requestLogger.generateRequestId();
+    
     try {
       // Validate URL first
       const validation = await urlValidator.validateURL(urlString);
       if (!validation.isValid) {
+        // Log security event for blocked URL
+        requestLogger.logSecurityEvent({
+          event: 'URL_VALIDATION_FAILED',
+          severity: 'WARNING',
+          url: urlString,
+          clientIp: requestContext.clientIp,
+          userId: requestContext.userId,
+          details: validation.errors.join(', '),
+          requestId
+        });
+        
         throw new Error(`URL validation failed: ${validation.errors.join(', ')}`);
       }
 
@@ -43,14 +58,37 @@ class SecureRequester {
         }
       };
 
+      // Log outbound request
+      requestLogger.logOutboundRequest({
+        method: 'GET',
+        url: urlString,
+        userAgent: this.defaultConfig.headers['User-Agent'],
+        clientIp: requestContext.clientIp,
+        userId: requestContext.userId,
+        endpoint: requestContext.endpoint,
+        requestId
+      });
+
       // Log request for security monitoring
       console.log(`[SECURE REQUEST] Fetching URL: ${urlString} (Platform: ${validation.platform.name})`);
 
       // Make the request
       const response = await axios.get(urlString, requestConfig);
+      const responseTime = Date.now() - startTime;
 
       // Additional security checks on response
       await this.validateResponse(response, urlString);
+
+      // Log successful response
+      requestLogger.logOutboundResponse({
+        url: urlString,
+        status: response.status,
+        statusText: response.statusText,
+        contentLength: response.data.length,
+        responseTime,
+        requestId,
+        success: true
+      });
 
       // Log successful request
       console.log(`[SECURE REQUEST] Success: ${urlString} (${response.status}, ${this.formatBytes(response.data.length)})`);
@@ -60,12 +98,38 @@ class SecureRequester {
         status: response.status,
         headers: response.headers,
         platform: validation.platform,
-        finalUrl: response.request.res.responseUrl || urlString
+        finalUrl: response.request.res.responseUrl || urlString,
+        requestId,
+        responseTime
       };
 
     } catch (error) {
+      const responseTime = Date.now() - startTime;
+      
+      // Log failed response
+      requestLogger.logOutboundResponse({
+        url: urlString,
+        status: error.response?.status || 0,
+        statusText: error.response?.statusText || 'ERROR',
+        contentLength: 0,
+        responseTime,
+        requestId,
+        success: false
+      });
+
       // Log security-relevant errors
       console.error(`[SECURE REQUEST] Failed: ${urlString} - ${error.message}`);
+
+      // Log security event for failed requests
+      requestLogger.logSecurityEvent({
+        event: 'REQUEST_FAILED',
+        severity: 'ERROR',
+        url: urlString,
+        clientIp: requestContext.clientIp,
+        userId: requestContext.userId,
+        details: error.message,
+        requestId
+      });
 
       // Re-throw with security context
       if (error.response) {

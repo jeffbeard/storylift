@@ -8,6 +8,7 @@ const requirementRoutes = require('./backend/routes/requirements');
 const storyRoutes = require('./backend/routes/stories');
 const userRoutes = require('./backend/routes/users');
 const matchingRoutes = require('./backend/routes/matching');
+const { globalLimiter, getRateLimitStatus } = require('./backend/middleware/rateLimiter');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -16,6 +17,12 @@ const PORT = process.env.PORT || 5000;
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Trust proxy for correct IP in reverse-proxy setups
+app.set('trust proxy', 1);
+
+// Global rate limiting
+app.use(globalLimiter);
 
 // API Routes
 app.use('/api/jobs', jobRoutes);
@@ -38,7 +45,11 @@ if (process.env.NODE_ENV === 'production') {
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', timestamp: new Date().toISOString() });
+  res.json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    rateLimit: getRateLimitStatus()
+  });
 });
 
 app.listen(PORT, () => {

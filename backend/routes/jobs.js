@@ -9,27 +9,129 @@ const puppeteer = require('puppeteer');
 const db = require('../models/database');
 const claudeService = require('../services/claudeService');
 const secureRequester = require('../services/secureRequester');
+const requestLogger = require('../services/requestLogger');
+const { 
+  dbReadLimiter, 
+  dbWriteLimiter, 
+  uploadLimiter, 
+  scrapingLimiter 
+} = require('../middleware/rateLimiter');
 
 const router = express.Router();
 
 const upload = multer({ dest: 'uploads/' });
 
 // Function to scrape JavaScript-rendered pages
-async function scrapeWithPuppeteer(url) {
+async function scrapeWithPuppeteer(url, requestContext = {}) {
   let browser = null;
+  const startTime = Date.now();
+  const requestId = requestLogger.generateRequestId();
+  
   try {
     // Validate URL through our security layer first
     const urlValidator = require('../services/urlValidator');
     const validation = await urlValidator.validateURL(url);
     if (!validation.isValid) {
+      // Log security event for blocked URL
+      requestLogger.logSecurityEvent({
+        event: 'PUPPETEER_URL_VALIDATION_FAILED',
+        severity: 'WARNING',
+        url: url,
+        clientIp: requestContext.clientIp,
+        userId: requestContext.userId,
+        details: validation.errors.join(', '),
+        requestId
+      });
+      
       throw new Error(`URL validation failed: ${validation.errors.join(', ')}`);
     }
 
+    // Log Puppeteer request
+    requestLogger.logOutboundRequest({
+      method: 'PUPPETEER_GET',
+      url: url,
+      userAgent: 'Puppeteer/HeadlessChrome',
+      clientIp: requestContext.clientIp,
+      userId: requestContext.userId,
+      endpoint: requestContext.endpoint,
+      requestId
+    });
+
     browser = await puppeteer.launch({
       headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox']
+      args: [
+        '--no-sandbox', 
+        '--disable-setuid-sandbox',
+        // Removed --disable-web-security for better security
+        '--disable-features=VizDisplayCompositor',
+        '--disable-dev-shm-usage',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        // Additional security flags
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
+        '--disable-extensions',
+        '--disable-plugins',
+        '--disable-default-apps',
+        '--disable-sync',
+        '--disable-translate',
+        '--hide-scrollbars',
+        '--mute-audio',
+        '--no-default-browser-check',
+        '--no-pings',
+        '--disable-background-networking',
+        '--disable-component-extensions-with-background-pages',
+        '--disable-ipc-flooding-protection',
+        '--disable-hang-monitor',
+        '--disable-prompt-on-repost',
+        '--disable-domain-reliability',
+        '--disable-client-side-phishing-detection',
+        '--disable-component-update',
+        '--disable-features=TranslateUI,BlinkGenPropertyTrees',
+        '--disable-print-preview',
+        '--disable-speech-api',
+        '--disable-file-system',
+        '--disable-permissions-api',
+        '--disable-presentation-api',
+        '--disable-remote-fonts',
+        '--disable-shared-workers',
+        '--disable-web-bluetooth',
+        '--disable-webgl',
+        '--disable-webgl2',
+        '--disable-web-security', // Keep this for now but add additional protections
+        '--user-data-dir=/tmp/puppeteer-chrome-data',
+        '--data-path=/tmp/puppeteer-chrome-data'
+      ]
     });
     const page = await browser.newPage();
+
+    // Additional security measures for the page
+    await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0');
+    
+    // Block unnecessary resources to reduce attack surface
+    await page.setRequestInterception(true);
+    page.on('request', (request) => {
+      const resourceType = request.resourceType();
+      // Only allow document, script, and stylesheet requests
+      if (['document', 'script', 'stylesheet', 'xhr', 'fetch'].includes(resourceType)) {
+        request.continue();
+      } else {
+        // Block images, fonts, media, etc.
+        request.abort();
+      }
+    });
+
+    // Set additional security headers
+    await page.setExtraHTTPHeaders({
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+      'Accept-Encoding': 'gzip, deflate',
+      'DNT': '1',
+      'Connection': 'keep-alive',
+      'Upgrade-Insecure-Requests': '1'
+    });
 
     // Set a reasonable timeout and wait for content to load
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
@@ -73,8 +175,45 @@ async function scrapeWithPuppeteer(url) {
       return document.body.innerText.trim();
     });
 
+    const responseTime = Date.now() - startTime;
+    
+    // Log successful Puppeteer response
+    requestLogger.logOutboundResponse({
+      url: url,
+      status: 200,
+      statusText: 'OK',
+      contentLength: content.length,
+      responseTime,
+      requestId,
+      success: true
+    });
+
     return content;
   } catch (error) {
+    const responseTime = Date.now() - startTime;
+    
+    // Log failed Puppeteer response
+    requestLogger.logOutboundResponse({
+      url: url,
+      status: 0,
+      statusText: 'ERROR',
+      contentLength: 0,
+      responseTime,
+      requestId,
+      success: false
+    });
+
+    // Log security event for failed Puppeteer requests
+    requestLogger.logSecurityEvent({
+      event: 'PUPPETEER_REQUEST_FAILED',
+      severity: 'ERROR',
+      url: url,
+      clientIp: requestContext.clientIp,
+      userId: requestContext.userId,
+      details: error.message,
+      requestId
+    });
+
     console.error('Puppeteer scraping failed:', error.message);
     throw new Error(`Failed to scrape URL with Puppeteer: ${error.message}`);
   } finally {
@@ -85,7 +224,7 @@ async function scrapeWithPuppeteer(url) {
 }
 
 // Get job descriptions - optionally filter by user_id
-router.get('/', async (req, res) => {
+router.get('/', dbReadLimiter, async (req, res) => {
   try {
     const { user_id } = req.query;
 
@@ -107,7 +246,7 @@ router.get('/', async (req, res) => {
 });
 
 // Get single job description with requirements
-router.get('/:id', async (req, res) => {
+router.get('/:id', dbReadLimiter, async (req, res) => {
   try {
     const [jobRows] = await db.execute(
       'SELECT * FROM job_descriptions WHERE id = ?',
@@ -133,7 +272,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Upload PDF job description
-router.post('/upload-pdf', upload.single('pdf'), async (req, res) => {
+router.post('/upload-pdf', uploadLimiter, upload.single('pdf'), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No PDF file uploaded' });
@@ -188,7 +327,7 @@ router.post('/upload-pdf', upload.single('pdf'), async (req, res) => {
 });
 
 // Add job description from URL
-router.post('/upload-url', async (req, res) => {
+router.post('/upload-url', scrapingLimiter, async (req, res) => {
   try {
     const { url, company, role, user_id } = req.body;
 
@@ -200,8 +339,15 @@ router.post('/upload-url', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
+    // Create request context for logging
+    const requestContext = {
+      clientIp: req.ip || req.connection.remoteAddress,
+      userId: user_id,
+      endpoint: '/api/jobs/upload-url'
+    };
+
     // Securely fetch content from URL with validation
-    const response = await secureRequester.secureGet(url);
+    const response = await secureRequester.secureGet(url, requestContext);
     const content = response.data;
 
     // Extract meaningful text content using cheerio
@@ -263,7 +409,7 @@ router.post('/upload-url', async (req, res) => {
     if (!textContent || textContent.trim().length < 50) {
       console.log('Basic scraping failed, trying Puppeteer for JavaScript-rendered content...');
       try {
-        textContent = await scrapeWithPuppeteer(url);
+        textContent = await scrapeWithPuppeteer(url, requestContext);
 
         // Clean up whitespace for Puppeteer content too
         textContent = textContent
@@ -326,7 +472,7 @@ router.post('/upload-url', async (req, res) => {
 });
 
 // Delete job description
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', dbWriteLimiter, async (req, res) => {
   try {
     const [result] = await db.execute(
       'DELETE FROM job_descriptions WHERE id = ?',
