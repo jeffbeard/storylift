@@ -53,11 +53,24 @@ ${jobContent}`
         return JSON.parse(jsonStr.trim());
       } else {
         console.log('Claude response:', content);
-        throw new Error('No valid JSON found in Claude response');
+        // Don't fall back to mock data for parsing errors - return empty results instead
+        return {
+          requirements: [],
+          qualifications: []
+        };
       }
     } catch (error) {
       console.error('Claude API error:', error.message);
-      return this.mockExtractRequirements(jobContent);
+      // Only use mock data if there's an API connection issue, not for parsing errors
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND' || error.response?.status >= 500) {
+        console.log('Using mock data due to API connection issue');
+        return this.mockExtractRequirements(jobContent);
+      }
+      // For other errors (like parsing), return empty results
+      return {
+        requirements: [],
+        qualifications: []
+      };
     }
   }
 

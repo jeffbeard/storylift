@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { jobsAPI } from '../services/api';
+import { useUser } from '../contexts/UserContext';
 import './JobsList.css';
 
 function JobsList() {
@@ -8,13 +9,27 @@ function JobsList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const navigate = useNavigate();
+  const { user, isAuthenticated, loading: userLoading } = useUser();
+
+  // Redirect if not authenticated
   useEffect(() => {
-    loadJobs();
-  }, []);
+    if (!userLoading && !isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, userLoading, navigate]);
+
+  useEffect(() => {
+    if (user && isAuthenticated) {
+      loadJobs();
+    }
+  }, [user, isAuthenticated]);
 
   const loadJobs = async () => {
+    if (!user) return;
+
     try {
-      const response = await jobsAPI.getAll();
+      const response = await jobsAPI.getByUserId(user.id);
       setJobs(response.data);
     } catch (err) {
       setError(err.response?.data?.error || err.message);
@@ -22,6 +37,16 @@ function JobsList() {
       setLoading(false);
     }
   };
+
+  // Show loading while checking authentication
+  if (userLoading) {
+    return <div className="loading">Loading...</div>;
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleDelete = async (jobId) => {
     if (!window.confirm('Are you sure you want to delete this job description and all related data?')) {
@@ -55,7 +80,7 @@ function JobsList() {
   return (
     <div className="jobs-list">
       <div className="jobs-header">
-        <h1>Job Descriptions</h1>
+        <h1>My Job Descriptions</h1>
         <Link to="/upload" className="btn btn-primary">
           Add New Job
         </Link>

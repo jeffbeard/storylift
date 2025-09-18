@@ -1,16 +1,27 @@
 const express = require('express');
 const db = require('../models/database');
+const storyMatchingService = require('../services/storyMatchingService');
 
 const router = express.Router();
 
-// Get all stories for a requirement
-router.get('/requirement/:requirementId', async (req, res) => {
+// Get all stories for a user
+router.get('/user/:userId', async (req, res) => {
   try {
     const [rows] = await db.execute(
-      'SELECT * FROM star_stories WHERE requirement_id = ?',
-      [req.params.requirementId]
+      'SELECT * FROM star_stories WHERE user_id = ? ORDER BY updated DESC',
+      [req.params.userId]
     );
     res.json(rows);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get stories for a specific requirement (via mapping table)
+router.get('/requirement/:requirementId', async (req, res) => {
+  try {
+    const stories = await storyMatchingService.getStoriesForRequirement(req.params.requirementId);
+    res.json(stories);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -37,14 +48,25 @@ router.get('/:id', async (req, res) => {
 // Create new story
 router.post('/', async (req, res) => {
   try {
-    const { requirement_id, situation, task, action, result, notes } = req.body;
+    const { user_id, title, description, situation, task, action, result, notes, requirement_id } = req.body;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'User ID is required' });
+    }
 
     const [result_db] = await db.execute(
-      'INSERT INTO star_stories (requirement_id, situation, task, action, result, notes) VALUES (?, ?, ?, ?, ?, ?)',
-      [requirement_id, situation || '', task || '', action || '', result || '', notes || '']
+      'INSERT INTO star_stories (user_id, title, description, situation, task, action, result, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      [user_id, title || '', description || '', situation || '', task || '', action || '', result || '', notes || '']
     );
 
-    res.json({ id: result_db.insertId, message: 'Story created successfully' });
+    const storyId = result_db.insertId;
+
+    // If requirement_id is provided, map the story to the requirement
+    if (requirement_id) {
+      await storyMatchingService.mapStoryToRequirement(storyId, requirement_id);
+    }
+
+    res.json({ id: storyId, message: 'Story created successfully' });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
@@ -53,11 +75,11 @@ router.post('/', async (req, res) => {
 // Update story
 router.put('/:id', async (req, res) => {
   try {
-    const { situation, task, action, result, notes } = req.body;
+    const { title, description, situation, task, action, result, notes } = req.body;
 
     const [result_db] = await db.execute(
-      'UPDATE star_stories SET situation = ?, task = ?, action = ?, result = ?, notes = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
-      [situation || '', task || '', action || '', result || '', notes || '', req.params.id]
+      'UPDATE star_stories SET title = ?, description = ?, situation = ?, task = ?, action = ?, result = ?, notes = ?, updated = CURRENT_TIMESTAMP WHERE id = ?',
+      [title || '', description || '', situation || '', task || '', action || '', result || '', notes || '', req.params.id]
     );
 
     if (result_db.affectedRows === 0) {
