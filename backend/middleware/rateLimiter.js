@@ -1,58 +1,4 @@
 const rateLimit = require('express-rate-limit');
-const RedisStore = require('rate-limit-redis');
-const Redis = require('redis');
-
-// Redis client for production (fallback to memory store if Redis unavailable)
-let redisClient = null;
-let store = null;
-
-// Initialize Redis connection
-async function initializeRedis() {
-  try {
-    if (process.env.REDIS_URL) {
-      redisClient = Redis.createClient({
-        url: process.env.REDIS_URL,
-        retry_strategy: (options) => {
-          if (options.error && options.error.code === 'ECONNREFUSED') {
-            console.warn('[RATE LIMITER] Redis connection refused, falling back to memory store');
-            return undefined; // Fall back to memory store
-          }
-          if (options.total_retry_time > 1000 * 60 * 60) {
-            console.error('[RATE LIMITER] Redis retry time exhausted');
-            return new Error('Retry time exhausted');
-          }
-          if (options.attempt > 10) {
-            console.error('[RATE LIMITER] Redis max retry attempts reached');
-            return undefined;
-          }
-          return Math.min(options.attempt * 100, 3000);
-        }
-      });
-
-      redisClient.on('error', (err) => {
-        console.warn('[RATE LIMITER] Redis error:', err.message);
-        redisClient = null;
-        store = null;
-      });
-
-      redisClient.on('connect', () => {
-        console.log('[RATE LIMITER] Connected to Redis');
-      });
-
-      await redisClient.connect();
-      store = new RedisStore({
-        sendCommand: (...args) => redisClient.sendCommand(args),
-      });
-    }
-  } catch (error) {
-    console.warn('[RATE LIMITER] Failed to connect to Redis, using memory store:', error.message);
-    redisClient = null;
-    store = null;
-  }
-}
-
-// Initialize Redis on startup
-initializeRedis();
 
 // Rate limiting configurations
 const createRateLimiter = (options) => {
@@ -78,11 +24,6 @@ const createRateLimiter = (options) => {
     },
     ...options
   };
-
-  // Use Redis store if available, otherwise use memory store
-  if (store) {
-    config.store = store;
-  }
 
   return rateLimit(config);
 };
@@ -132,8 +73,7 @@ const scrapingLimiter = createRateLimiter({
 // Health check function
 const getRateLimitStatus = () => {
   return {
-    redisConnected: redisClient !== null,
-    storeType: store ? 'redis' : 'memory',
+    storeType: 'memory',
     timestamp: new Date().toISOString()
   };
 };
@@ -145,6 +85,5 @@ module.exports = {
   dbWriteLimiter,
   uploadLimiter,
   scrapingLimiter,
-  getRateLimitStatus,
-  initializeRedis
+  getRateLimitStatus
 };
