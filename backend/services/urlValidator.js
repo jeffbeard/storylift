@@ -1,4 +1,5 @@
 const { URL } = require('url');
+const escapeStringRegexp = require('escape-string-regexp');
 const db = require('../models/database');
 
 class URLValidator {
@@ -26,7 +27,7 @@ class URLValidator {
       this.platforms = rows.map(row => ({
         name: row.name,
         domain: row.domain,
-        domain_pattern: row.domain_pattern,
+        domain_pattern: this.sanitizeDomainPattern(row.domain_pattern),
         category: row.category,
         region: row.region,
         is_ats: Boolean(row.is_ats),
@@ -47,6 +48,24 @@ class URLValidator {
       // Return empty array if database fails
       return [];
     }
+  }
+
+  sanitizeDomainPattern(pattern) {
+    if (!pattern) return null;
+
+    // Only allow basic domain patterns with wildcards
+    // Remove any potentially dangerous characters
+    const sanitized = pattern
+      .replace(/[^\w\-\.\*]/g, '') // Only allow alphanumeric, dash, dot, asterisk
+      .substring(0, 100); // Limit length to prevent ReDoS
+
+    // Validate that pattern looks like a domain
+    if (!/^[\w\-\.\*]+$/.test(sanitized)) {
+      console.warn(`[URL VALIDATOR] Rejecting invalid domain pattern: ${pattern}`);
+      return null;
+    }
+
+    return sanitized;
   }
 
   buildDomainAllowlist() {
@@ -135,10 +154,19 @@ class URLValidator {
 
       // Pattern matching for subdomains
       if (platform.domain_pattern) {
-        const pattern = platform.domain_pattern.replace('*', '.*');
-        const regex = new RegExp(`^${pattern}$`, 'i');
-        if (regex.test(hostname)) {
-          return true;
+        // Safely escape the pattern and replace only literal asterisks with regex wildcards
+        const escapedPattern = escapeStringRegexp(platform.domain_pattern)
+          .replace(/\\\*/g, '.*'); // Replace escaped asterisks with regex wildcards
+
+        try {
+          const regex = new RegExp(`^${escapedPattern}$`, 'i');
+          if (regex.test(hostname)) {
+            return true;
+          }
+        } catch (regexError) {
+          // Log invalid regex patterns but don't crash
+          console.warn(`[URL VALIDATOR] Invalid domain pattern for platform ${platform.name}: ${platform.domain_pattern}`);
+          return false;
         }
       }
 
