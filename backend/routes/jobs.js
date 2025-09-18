@@ -8,6 +8,7 @@ const cheerio = require('cheerio');
 const puppeteer = require('puppeteer');
 const db = require('../models/database');
 const claudeService = require('../services/claudeService');
+const secureRequester = require('../services/secureRequester');
 
 const router = express.Router();
 
@@ -17,6 +18,13 @@ const upload = multer({ dest: 'uploads/' });
 async function scrapeWithPuppeteer(url) {
   let browser = null;
   try {
+    // Validate URL through our security layer first
+    const urlValidator = require('../services/urlValidator');
+    const validation = await urlValidator.validateURL(url);
+    if (!validation.isValid) {
+      throw new Error(`URL validation failed: ${validation.errors.join(', ')}`);
+    }
+
     browser = await puppeteer.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox']
@@ -66,6 +74,9 @@ async function scrapeWithPuppeteer(url) {
     });
 
     return content;
+  } catch (error) {
+    console.error('Puppeteer scraping failed:', error.message);
+    throw new Error(`Failed to scrape URL with Puppeteer: ${error.message}`);
   } finally {
     if (browser) {
       await browser.close();
@@ -189,8 +200,8 @@ router.post('/upload-url', async (req, res) => {
       return res.status(400).json({ error: 'User ID is required' });
     }
 
-    // Fetch content from URL
-    const response = await axios.get(url);
+    // Securely fetch content from URL with validation
+    const response = await secureRequester.secureGet(url);
     const content = response.data;
 
     // Extract meaningful text content using cheerio

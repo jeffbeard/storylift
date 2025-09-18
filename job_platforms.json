@@ -1,0 +1,311 @@
+{
+  "platforms": [
+    {
+      "name": "Indeed",
+      "domain": "indeed.com",
+      "domain_pattern": "*.indeed.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false,
+      "status": "active",
+      "https_only": true,
+      "scraping_config": {
+        "timeout": 10000,
+        "max_size": "5MB"
+      }
+    },
+    {
+      "name": "LinkedIn",
+      "domain": "linkedin.com",
+      "domain_pattern": "*.linkedin.com",
+      "category": "professional",
+      "region": "global",
+      "is_ats": false,
+      "status": "active",
+      "https_only": true,
+      "scraping_config": {
+        "timeout": 10000,
+        "max_size": "5MB"
+      }
+    },
+    {
+      "name": "Glassdoor",
+      "domain": "glassdoor.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Monster",
+      "domain": "monster.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "CareerBuilder",
+      "domain": "careerbuilder.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "ZipRecruiter",
+      "domain": "ziprecruiter.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "SimplyHired",
+      "domain": "simplyhired.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Craigslist",
+      "domain": "craigslist.org",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Facebook Jobs",
+      "domain": "facebook.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Snagajob",
+      "domain": "snagajob.com",
+      "category": "general",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Ashby",
+      "domain": "ashbyhq.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Greenhouse",
+      "domain": "greenhouse.io",
+      "domain_pattern": "*.greenhouse.io",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true,
+      "status": "active",
+      "https_only": true,
+      "scraping_config": {
+        "timeout": 10000,
+        "max_size": "5MB"
+      }
+    },
+    {
+      "name": "Workday",
+      "domain": "workday.com",
+      "domain_pattern": "*.myworkdayjobs.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true,
+      "status": "active",
+      "https_only": true,
+      "scraping_config": {
+        "timeout": 10000,
+        "max_size": "5MB"
+      }
+    },
+    {
+      "name": "Lever",
+      "domain": "lever.co",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "BambooHR",
+      "domain": "bamboohr.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "SmartRecruiters",
+      "domain": "smartrecruiters.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "iCIMS",
+      "domain": "icims.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Taleo",
+      "domain": "taleo.net",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "SuccessFactors",
+      "domain": "successfactors.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Bullhorn",
+      "domain": "bullhornstaffing.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Jobvite",
+      "domain": "jobvite.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Cornerstone OnDemand",
+      "domain": "cornerstone.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Workable",
+      "domain": "workable.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Recruitee",
+      "domain": "recruitee.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Breezy HR",
+      "domain": "breezy.hr",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Zoho Recruit",
+      "domain": "zoho.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Freshteam",
+      "domain": "freshteam.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Teamtailor",
+      "domain": "teamtailor.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Personio",
+      "domain": "personio.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "RecruitCRM",
+      "domain": "recruitcrm.com",
+      "category": "ats",
+      "region": "global",
+      "is_ats": true
+    },
+    {
+      "name": "Stack Overflow Jobs",
+      "domain": "stackoverflow.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Dice",
+      "domain": "dice.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Hired",
+      "domain": "hired.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Triplebyte",
+      "domain": "triplebyte.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "HackerRank Jobs",
+      "domain": "hackerrank.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Toptal",
+      "domain": "toptal.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Gun.io",
+      "domain": "gun.io",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "Remote In Tech",
+      "domain": "remoteintech.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false
+    },
+    {
+      "name": "TechJobs",
+      "domain": "techjobs.com",
+      "category": "tech",
+      "region": "global",
+      "is_ats": false,
+      "status": "active",
+      "https_only": true,
+      "scraping_config": {
+        "timeout": 10000,
+        "max_size": "5MB"
+      }
+    }
+  ]
+}
